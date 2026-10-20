@@ -7,7 +7,7 @@
  * The `wslWorkspace` translations (Chinese, the primary product copy).
  */
 export const zh: Record<string, string> = {
-  'action.add': 'WSL 工作区',
+  'action.add': 'WSL工作区',
   'action.title': '添加 WSL 工作区…',
 
   'dialog.title': '添加 WSL 工作区',

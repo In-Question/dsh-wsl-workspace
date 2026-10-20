@@ -41,19 +41,23 @@ const STYLES = `
 .dww-action--rail {
   width: 36px;
   height: 36px;
-  color: var(--dsw-alias-label-primary);
 }
-/* The wide counterpart of the rail button: the same control in the dialog's header, where it is
-   laid out by the container rather than by a fixed box. It existed only as the wide/rail branch of
-   the className in AddWslWorkspace.tsx with no rule behind it, so the wide form silently inherited
-   the base .dww-action padding at the dialog's density — which is where the "the dialog's button
-   looks smaller than the sidebar's" report came from. */
+/* Same box as the shell's own footer actions: the base rule's 50% radius resolves per axis,
+   so a wide box needs the length restated or it draws an ellipse. */
 .dww-action--wide {
-  width: auto;
-  min-width: 96px;
-  height: 32px;
-  padding: 0 12px;
+  flex: 0 0 auto;
+  width: 100%;
+  height: 42px;
+  padding: 0 10px 0 8px;
+  justify-content: flex-start;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 22px;
+  white-space: nowrap;
 }
+/* The base rule is the dimmed rail tone. */
+.dww-action--rail,
+.dww-action--wide { color: var(--dsw-alias-label-primary); }
 .dww-action svg { flex: none; }
 
 /* The W letter mark of the sidebar action (sized for wide/rail buttons). */
@@ -65,6 +69,13 @@ const STYLES = `
   user-select: none;
 }
 .dww-action--rail .dww-letter { font-size: 17px; }
+/* The neighbours start their label at 8 + 16 + 8; a 16px box centres the W on that line. */
+.dww-action--wide .dww-letter {
+  flex: none;
+  width: 16px;
+  margin-right: 8px;
+  text-align: center;
+}
 
 /* Full-viewport overlay + centered card (mirrors the platform Mask/Dialog). */
 .dww-overlay {

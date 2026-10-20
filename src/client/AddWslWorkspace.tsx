@@ -159,7 +159,8 @@ export function AddWslWorkspace({ wide, t, describe, checkPreset, listDistros, l
       // The default browse root walks from `/`; the input defaults to `/home/`.
       setBrowsing(true)
       setOpening(false)
-      setError(presetIssue)
+      // `undefined` (all variants healthy) is not `null`, so the strip used to render empty.
+      setError(presetIssue ?? null)
       if (first !== '') void refreshBrowse('/', first)
     })()
   }
@@ -196,21 +197,23 @@ export function AddWslWorkspace({ wide, t, describe, checkPreset, listDistros, l
     return () => window.removeEventListener('keydown', onKey)
   }, [open, busy])
 
-  if (!open) {
-    // A W-letter action beside Settings at the sidebar foot; the title
-    // carries the label in both wide and rail states.
-    return (
-      <button
-        type="button"
-        className={wide ? 'dww-action dww-action--wide' : 'dww-action dww-action--rail'}
-        title={t('action.title')}
-        aria-label={t('action.title')}
-        onClick={() => setOpen(true)}
-      >
-        <span className="dww-letter" aria-hidden="true">W</span>
-      </button>
-    )
-  }
+  // Kept mounted while open; aria-modal means it must leave the tab order instead.
+  const trigger = (
+    <button
+      type="button"
+      className={wide ? 'dww-action dww-action--wide' : 'dww-action dww-action--rail'}
+      title={t('action.title')}
+      aria-label={t('action.title')}
+      aria-hidden={open || undefined}
+      tabIndex={open ? -1 : undefined}
+      onClick={() => setOpen(true)}
+    >
+      <span className="dww-letter" aria-hidden="true">W</span>
+      {wide ? t('action.add') : null}
+    </button>
+  )
+
+  if (!open) return trigger
 
   const onDrill = (name: string): void => {
     const next = dirChildPath(listing?.path ?? browsePath, name)
@@ -293,7 +296,7 @@ export function AddWslWorkspace({ wide, t, describe, checkPreset, listDistros, l
   const maskClick = (): void => { if (!busy) setOpen(false) }
   const listScroll: UIEventHandler<HTMLDivElement> = () => { /* scroll container handles overflow */ }
 
-  return (
+  const dialog = (
     <div className="dww-overlay">
       <div className="dww-overlay-mask" onClick={maskClick} />
       <div className="dww-card" role="dialog" aria-modal="true" aria-label={t('dialog.title')}>
@@ -317,7 +320,8 @@ export function AddWslWorkspace({ wide, t, describe, checkPreset, listDistros, l
           {helpOpen ? (
             <WslHelp t={t} description={selfDescription} />
           ) : (<>
-          {error !== null ? (
+          {/* Text, not merely non-null: a blank message drew an empty bordered row. */}
+          {error ? (
             <div className="dww-error">
               {error}
               <button type="button" className="dww-retry" onClick={() => setRetrySeq((sequence: number) => sequence + 1)}>{t('dialog.retry')}</button>
@@ -399,6 +403,13 @@ export function AddWslWorkspace({ wide, t, describe, checkPreset, listDistros, l
         </div>
       </div>
     </div>
+  )
+
+  return (
+    <>
+      {trigger}
+      {dialog}
+    </>
   )
 }
 
