@@ -41,6 +41,10 @@ jobs:
         run: npm run verify
       - name: pure-node unit bucket
         run: npm run test:unit
+      # The client half's interaction states (#101). It reads the COMMITTED lib/client.js, so it needs
+      # no build: a stale bundle is what a user loads, and this is the gate that says so.
+      - name: client interaction states (rendered, jsdom + real React)
+        run: npm run test:client
       - name: rebuild must reproduce the committed lib/ byte-for-byte
         run: |
           npm run build
@@ -77,6 +81,16 @@ jobs:
         run: node ci/install-pinned.mjs
       - name: node bucket (build + host-package tests + host pair + rank --strict)
         run: npm run test:node
+      # The world-consistency table (#101): one cwd table fed to every provider that decides which
+      # distribution and Linux directory a session is in. Needs the pinned host tree (schemastery).
+      - name: world-consistency table
+        run: npm run test:world
+      # The artifact we hand the host, against the host's own rules (#101, G3), and the install
+      # shapes it is loaded from (#101, G4). Both read the pinned closure; neither boots anything.
+      - name: artifact semantics of the generated variants
+        run: npm run test:artifacts
+      - name: install shapes (manifest surface + a profile-shaped load)
+        run: npm run test:install
       - name: typecheck does not grow past its recorded baseline
         run: node scripts/typecheck-gate.mjs
       - name: clean npm install of the packed tarball
