@@ -176,9 +176,13 @@ for (const unit of units) {
       // gates their class normally reaches, so intersecting with `seams` would consult nothing and
       // report "0 of 20" as if that were a reading about the plane. (It did, on the first run.)
       const consulted = opts.onlyGates === undefined ? gatesFor(unit) : opts.onlyGates
+      // A bundle-reading plane cannot see an `src/` plant unless the bundle is rebuilt for it. The
+      // per-plant `build` flag is tuned to the everyday gates, so consulting `session`/`seams`/`wsl`
+      // has to force the rebuild itself — the first plane run silently measured a stale `lib/`.
+      const needsBuild = plantSpec.build === true || consulted.some(id => LIB_READING.has(id))
       const { gate, output } = opts.allReds
-        ? worstGate(consulted, plantSpec.build === true)
-        : firstRed(consulted, plantSpec.build === true)
+        ? worstGate(consulted, needsBuild)
+        : firstRed(consulted, needsBuild)
       if (gate === null) {
         results.push({ verdict: 'MISS', detail: `${plantSpec.note} — no gate reddened` })
         continue
