@@ -70,7 +70,7 @@ export const EXTRA_GATES = [
 ]
 
 /** Gates that answer from the built bundle: a `src/` edit is invisible to them until `lib/` is rebuilt. */
-const LIB_READING = new Set(['client', 'artifacts', 'node'])
+export const LIB_READING = new Set(['client', 'node', 'seams', 'session', 'wsl'])
 
 /** @returns the gate descriptor for an id. */
 export function gateById(id) {

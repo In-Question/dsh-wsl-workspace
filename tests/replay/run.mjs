@@ -25,7 +25,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import {
-  assertCleanTree, baselineRed, buildLib, firstRed, plant, repoRoot, revert, runGate, runnableIds,
+  LIB_READING, assertCleanTree, baselineRed, buildLib, firstRed, plant, repoRoot, revert, runGate, runnableIds,
 } from '../../scripts/mutation-engine.mjs'
 import { CANONICAL, UNITS, gatesFor } from './defects.mjs'
 
@@ -119,7 +119,7 @@ function worstGate(ids, needsBuild) {
   const reds = []
   let built = null
   for (const id of runnableIds(ids)) {
-    if (needsBuild && ['client', 'node'].includes(id) && built === null) {
+    if (needsBuild && LIB_READING.has(id) && built === null) {
       built = buildLib()
       if (!built.ok) return { gate: ['build'], output: built.detail }
     }
