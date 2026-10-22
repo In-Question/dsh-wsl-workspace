@@ -178,9 +178,11 @@ for (const unit of units) {
       // gates their class normally reaches, so intersecting with `seams` would consult nothing and
       // report "0 of 20" as if that were a reading about the plane. (It did, on the first run.)
       const consulted = opts.onlyGates === undefined ? gatesFor(unit) : opts.onlyGates
-      // A plant that was judged against nothing is not a miss, it is a broken run. `lessons.zh.md` #2
-      // is exactly this accident — four gates exited 0 because their prerequisite was missing, and the
-      // frame read green. Counting consults makes that shape loud instead of quiet.
+      // A plant judged against no gate is a broken run, not a miss — `lessons.zh.md` #2 is this exact
+      // accident (four gates exited 0 because a prerequisite was missing, and the frame read green).
+      // Note the guard is about an *empty* consulted set: a fast green is not evidence of a broken
+      // instrument. The first `session` adjudication was believed to be one and was not — the gate
+      // really does answer in 7.5 s, and 0 of 31 plants is a reading about the gate.
       if (runnableIds(consulted).length === 0) {
         throw new Error(`nothing to consult for ${unit.id}: every gate in [${consulted.join(',')}] is filtered out on this platform`)
       }
