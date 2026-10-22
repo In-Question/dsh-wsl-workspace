@@ -2,9 +2,9 @@
   "note": "the two readings a release carries, written by `npm run release:readings`; `npm run test:readings` (and the publish job) refuse a version without them. Do not hand-edit.",
   "versions": {
     "0.7.9": {
-      "takenAt": "2026-10-22 0444",
-      "head": "dc2a05e",
-      "tableSha": "9355bab7850d",
+      "takenAt": "2026-10-22 0459",
+      "head": "276aee4",
+      "tableSha": "9c8f2536f1d8",
       "replay": {
         "caught": 20,
         "total": 20,
