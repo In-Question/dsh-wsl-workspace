@@ -160,6 +160,8 @@ if (red.length > 0) {
 
 const started = Date.now()
 const rows = []
+/** How many gate runs this invocation actually paid for, so a no-op adjudication cannot read as a rate. */
+let gateRuns = 0
 /** Per-plane catch counts, only meaningful with `--all-reds` (first-red ordering hides the rest). */
 const planeCatches = {}
 for (const unit of units) {
@@ -176,10 +178,17 @@ for (const unit of units) {
       // gates their class normally reaches, so intersecting with `seams` would consult nothing and
       // report "0 of 20" as if that were a reading about the plane. (It did, on the first run.)
       const consulted = opts.onlyGates === undefined ? gatesFor(unit) : opts.onlyGates
+      // A plant that was judged against nothing is not a miss, it is a broken run. `lessons.zh.md` #2
+      // is exactly this accident — four gates exited 0 because their prerequisite was missing, and the
+      // frame read green. Counting consults makes that shape loud instead of quiet.
+      if (runnableIds(consulted).length === 0) {
+        throw new Error(`nothing to consult for ${unit.id}: every gate in [${consulted.join(',')}] is filtered out on this platform`)
+      }
       // A bundle-reading plane cannot see an `src/` plant unless the bundle is rebuilt for it. The
       // per-plant `build` flag is tuned to the everyday gates, so consulting `session`/`seams`/`wsl`
       // has to force the rebuild itself — the first plane run silently measured a stale `lib/`.
       const needsBuild = plantSpec.build === true || consulted.some(id => LIB_READING.has(id))
+      gateRuns += runnableIds(consulted).length
       const { gate, output } = opts.allReds
         ? worstGate(consulted, needsBuild)
         : firstRed(consulted, needsBuild)
@@ -232,6 +241,7 @@ const skipped = runnableIds(idsInScope).length !== idsInScope.length
 console.log('')
 // A `--only` run must not read like the headline: the denominator says which units were actually run.
 const denominator = opts.only === undefined ? CANONICAL.length : canonical.length
+console.log(`replay: ${gateRuns} gate run(s) were consulted over ${rows.reduce((n, row) => n + row.plants.length, 0)} plant(s)`)
 console.log(`replay: ${caughtOf(canonical)} of ${denominator}${denominator === CANONICAL.length ? '' : ' (selected)'} caught`
   + ` — class-wide devices (strict): ${strictOf(canonical)}`
   + ` | extras (${caughtOf(extras)}/${extras.length})`
