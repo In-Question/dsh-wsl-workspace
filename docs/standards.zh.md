@@ -58,7 +58,7 @@ CI 很贵，而且一轮红只告诉你一件事。**推之前**至少做到：
 | 单元桶无**新**失败 | `npm run test:unit`（本机有 9 条环境性失败，判据是"没有新的"，不是"全绿"） |
 | 构建可复现 | 再 `npm run build`，`git status lib/` 为空 |
 | 类型不增长 | `npx tsc -p tsconfig.json --noEmit \| grep -c "error TS"` |
-| 文档门禁 | `npm run test:docs`、`npm run test:docs-claims` |
+| 文档门禁 | `npm run test:docs-claims`（`test:docs` 已于 2026-10-21 依裁决退役，十语 README 改为人工对齐） |
 
 ## S7 判断"推成功了吗"要看远端 SHA
 

@@ -44,10 +44,8 @@ export function npmCli() {
 export const GATES = [
   { id: 'unit', script: 'test:unit' },
   { id: 'world', script: 'test:world' },
-  { id: 'artifacts', script: 'test:artifacts' },
   { id: 'install', script: 'test:install' },
   { id: 'client', script: 'test:client' },
-  { id: 'docs', script: 'test:docs' },
 ]
 
 /**
@@ -61,11 +59,18 @@ export const EXTRA_GATES = [
   { id: 'node', script: 'test:node' },
   { id: 'win32', script: 'test:win32' },
   { id: 'libsync', script: 'verify:lib-sync' },
+  // The real-machine planes. They are consulted only on demand (`--only-gates seams,session,wsl`)
+  // because each boots a host or a distribution: adding them to the default order would make every
+  // plant pay minutes it cannot afford. Asked and answered separately, they say whether the 27% of
+  // the apparatus the offline gates never touch is load-bearing, or unadjudicated.
+  { id: 'seams', script: 'test:seams' },
+  { id: 'session', script: 'test:session' },
+  { id: 'wsl', script: 'test:wsl' },
   { id: 'contract', script: 'test:contract' },
 ]
 
 /** Gates that answer from the built bundle: a `src/` edit is invisible to them until `lib/` is rebuilt. */
-const LIB_READING = new Set(['client', 'artifacts', 'node'])
+export const LIB_READING = new Set(['client', 'node', 'seams', 'session', 'wsl'])
 
 /** @returns the gate descriptor for an id. */
 export function gateById(id) {

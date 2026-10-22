@@ -25,7 +25,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import {
-  assertCleanTree, baselineRed, firstRed, plant, repoRoot, revert, runnableIds,
+  LIB_READING, assertCleanTree, baselineRed, buildLib, firstRed, plant, repoRoot, revert, runGate, runnableIds,
 } from '../../scripts/mutation-engine.mjs'
 import { CANONICAL, UNITS, gatesFor } from './defects.mjs'
 
@@ -38,6 +38,10 @@ function options(argv) {
     strict: argv.includes('--strict'),
     list: argv.includes('--list'),
     dry: argv.includes('--dry'),
+    allReds: argv.includes('--all-reds'),
+    onlyGates: argv.includes('--only-gates')
+      ? argv[argv.indexOf('--only-gates') + 1].split(',').map(id => id.trim()).filter(Boolean)
+      : undefined,
   }
 }
 
@@ -104,6 +108,28 @@ function summarise(output) {
   return [output.trim().split('\n').filter(line => line.trim() !== '').slice(-2).join(' | ').slice(0, 200)]
 }
 
+/**
+ * Run every consulted gate and report all of the reds, not the first one.
+ *
+ * First-red ordering is what makes a late gate look useless: a plant caught by `unit` in five seconds
+ * never reaches the plane that might also have caught it. This mode is how the real-machine layer
+ * (`seams` / `session` / `wsl`) is asked whether anything depends on it.
+ */
+function worstGate(ids, needsBuild) {
+  const reds = []
+  let built = null
+  for (const id of runnableIds(ids)) {
+    if (needsBuild && LIB_READING.has(id) && built === null) {
+      built = buildLib()
+      if (!built.ok) return { gate: ['build'], output: built.detail }
+    }
+    const result = runGate(id)
+    if (!result.ok) reds.push({ id, output: result.output })
+  }
+  if (reds.length === 0) return { gate: null, output: '' }
+  return { gate: reds.map(entry => entry.id), output: reds.map(entry => entry.output).join('\n') }
+}
+
 const opts = options(process.argv.slice(2))
 const units = opts.only === undefined ? UNITS : UNITS.filter(unit => opts.only.has(unit.id))
 
@@ -124,7 +150,7 @@ assertCleanTree('replay')
 
 // Precondition 2: every gate this run will consult must be green on the clean tree. A gate red for an
 // environment reason (no jsdom, no pinned closure) answers "caught" for every plant.
-const idsInScope = [...new Set(units.flatMap(gatesFor))]
+const idsInScope = opts.onlyGates ?? [...new Set(units.flatMap(gatesFor))]
 const red = baselineRed(idsInScope)
 if (red.length > 0) {
   console.error(`replay: these gates are red on a clean tree — an environment, not a measurement: ${red.join(', ')}`)
@@ -134,6 +160,10 @@ if (red.length > 0) {
 
 const started = Date.now()
 const rows = []
+/** How many gate runs this invocation actually paid for, so a no-op adjudication cannot read as a rate. */
+let gateRuns = 0
+/** Per-plane catch counts, only meaningful with `--all-reds` (first-red ordering hides the rest). */
+const planeCatches = {}
 for (const unit of units) {
   const results = []
   for (const plantSpec of unit.plants) {
@@ -144,16 +174,37 @@ for (const unit of units) {
       continue
     }
     try {
-      const { gate, output } = firstRed(gatesFor(unit), plantSpec.build === true)
+      // `--only-gates` **replaces** the consulted set rather than intersecting it: the units list the
+      // gates their class normally reaches, so intersecting with `seams` would consult nothing and
+      // report "0 of 20" as if that were a reading about the plane. (It did, on the first run.)
+      const consulted = opts.onlyGates === undefined ? gatesFor(unit) : opts.onlyGates
+      // A plant judged against no gate is a broken run, not a miss — `lessons.zh.md` #2 is this exact
+      // accident (four gates exited 0 because a prerequisite was missing, and the frame read green).
+      // Note the guard is about an *empty* consulted set: a fast green is not evidence of a broken
+      // instrument. The first `session` adjudication was believed to be one and was not — the gate
+      // really does answer in 7.5 s, and 0 of 31 plants is a reading about the gate.
+      if (runnableIds(consulted).length === 0) {
+        throw new Error(`nothing to consult for ${unit.id}: every gate in [${consulted.join(',')}] is filtered out on this platform`)
+      }
+      // A bundle-reading plane cannot see an `src/` plant unless the bundle is rebuilt for it. The
+      // per-plant `build` flag is tuned to the everyday gates, so consulting `session`/`seams`/`wsl`
+      // has to force the rebuild itself — the first plane run silently measured a stale `lib/`.
+      const needsBuild = plantSpec.build === true || consulted.some(id => LIB_READING.has(id))
+      gateRuns += runnableIds(consulted).length
+      const { gate, output } = opts.allReds
+        ? worstGate(consulted, needsBuild)
+        : firstRed(consulted, needsBuild)
       if (gate === null) {
         results.push({ verdict: 'MISS', detail: `${plantSpec.note} — no gate reddened` })
         continue
       }
       const names = summarise(output)
+      const gates = Array.isArray(gate) ? gate : [gate]
       results.push({
         verdict: 'caught',
-        detail: `${gate}: ${plantSpec.note}`,
-        source: gate === 'build' ? 'build' : catchSource(unit.issue, names),
+        detail: `${gates.join('+')}: ${plantSpec.note}`,
+        gates,
+        source: gates.includes('build') ? 'build' : catchSource(unit.issue, names),
         caughtAs: names.join(' / ').slice(0, 200),
       })
     } catch (error) {
@@ -167,6 +218,7 @@ for (const unit of units) {
   const caught = results.filter(row => row.verdict === 'caught')
   const verdict = invalid.length > 0 ? 'INVALID' : missed.length > 0 ? 'MISS' : 'caught'
   const generic = caught.filter(row => row.source === 'generic').length
+  for (const row of caught) (row.gates ?? []).forEach(g => { planeCatches[g] = (planeCatches[g] ?? 0) + 1 })
   rows.push({
     issue: unit.issue,
     id: unit.id,
@@ -191,6 +243,7 @@ const skipped = runnableIds(idsInScope).length !== idsInScope.length
 console.log('')
 // A `--only` run must not read like the headline: the denominator says which units were actually run.
 const denominator = opts.only === undefined ? CANONICAL.length : canonical.length
+console.log(`replay: ${gateRuns} gate run(s) were consulted over ${rows.reduce((n, row) => n + row.plants.length, 0)} plant(s)`)
 console.log(`replay: ${caughtOf(canonical)} of ${denominator}${denominator === CANONICAL.length ? '' : ' (selected)'} caught`
   + ` — class-wide devices (strict): ${strictOf(canonical)}`
   + ` | extras (${caughtOf(extras)}/${extras.length})`
@@ -200,6 +253,9 @@ const skippedByFlag = (process.env.DSH_REPLAY_SKIP_GATES ?? '').split(',').map(i
 if (skippedByFlag.length > 0) {
   console.log(`ADJUDICATION RUN, not the headline: gates removed by DSH_REPLAY_SKIP_GATES=${skippedByFlag.join(',')}.` +
     ' A unit that still reddened was caught by something else; a unit that went MISS names a gate that was load-bearing.')
+}
+if (opts.onlyGates !== undefined) {
+  console.log(`ADJUDICATION RUN, not the headline: only the gate(s) ${opts.onlyGates.join(',')} were consulted, so this rate measures that plane alone.`)
 }
 if (broken > 0) console.error(`replay: ${broken} unit(s) could not be measured — a plant that does not apply is not a reading.`)
 
@@ -218,7 +274,12 @@ if (opts.json) {
   console.log(`replay: wrote ${relative(repoRoot, path)}`)
 }
 
-if (opts.strict) console.log('strict: the number that would have stopped the original report is the class-wide one.')
+if (Object.keys(planeCatches).length > 1 || opts.onlyGates !== undefined) {
+  console.log(`per-plane red plants (${opts.allReds ? 'every consulted gate ran' : 'first-red ordering'}): ${JSON.stringify(planeCatches)}`)
+  if (opts.onlyGates !== undefined) {
+    console.log(`exclusive to the consulted set (${opts.onlyGates.join(',')}): plants that reddened here and are not counted as caught by the everyday gates — the answer to "does anything depend on this plane" is that number, not the rate.`)
+  }
+}
 
 // The benchmark reports; it does not gate. A plant that cannot be applied, however, means the table
 // and the tree have drifted apart, and that is worth failing a run over.

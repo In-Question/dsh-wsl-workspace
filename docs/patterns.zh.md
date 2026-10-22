@@ -5,7 +5,7 @@
 > 两套账本共享同一个形状：**先声明**、**再有一道会失败的闸逐条比对**、**两个方向都失败**——
 > 现实里多出来的，和声明过的却消失的，都是红。
 >
-> **谁在读它**：没有闸门把这份说明当判据（`npm run test:docs` 只检查它的相对链接能不能解析）。
+> **谁在读它**：没有闸门把这份说明当判据（历史上只有已退役的文档 parity 闸扫过它的链接；现在没有闸门把这份说明当判据）。
 > 三套装置的规则本体分别住在 [`tests/deliberate-reds.mjs`](../tests/deliberate-reds.mjs)、
 > [`scripts/run-seams.mjs`](../scripts/run-seams.mjs)、
 > [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)、[`bash-parity.md`](./bash-parity.md)，

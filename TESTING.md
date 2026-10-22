@@ -4,7 +4,7 @@ This document describes how to verify `dsh-wsl-workspace` after a change or befo
 
 > **Fast path (same commands CI runs):** after `npm ci && node ci/install-pinned.mjs`,
 > run `npm run test:unit`, `npm run test:client`, `npm run test:node`, `npm run test:world`,
-> `npm run test:artifacts`, `npm run test:install`, `npm run test:profile`, `npm run test:wsl`
+> `npm run test:install`, `npm run test:profile`, `npm run test:wsl`
 > (Windows + a real distribution), `npm run typecheck:gate` and `npm run verify:artifact`.
 > Before a release, also `npm run test:session` (needs Windows + a distribution).
 > The full inventory of every check — command, prerequisites, CI home, and what is
@@ -51,13 +51,9 @@ npm run test:world
 
 Every provider decides for itself "which distribution and which Linux directory is this session in?". `tests/world-consistency.test.mjs` feeds one cwd table to every such seam (`resolveTarget`, `buildSessionSpec`, `backendCwd`, the skill provider, and the client's reference translation) and requires agreement, an out-loud refusal, or a registered gap with its ticket. The provider list is derived from `src/`, so a new provider cannot be added without a row. It needs the pinned host tree (`node ci/install-pinned.mjs`).
 
-## The artifact we hand the host (issue #101)
+## The artifact we hand the host (issue #101) — retired, with the reading
 
-```powershell
-npm run test:artifacts
-```
-
-`tests/artifact-semantics.test.mjs` reads the **shipped presets** (`dsh-web-app/presets/*.patch.yml`) and transforms them, then checks the invariants a host enforces at load time: the WSL note is appended exactly once (and not at all where the preset declares `complete: true`), the `{{…}}` multiset equals the source's, every mounted path exists inside `lib/`, every bare import of every mounted file is in the host closure (#89), no duplicate row id, and the world's `isolate:` keys are the ones the consumer ledger enumerates.
+`tests/artifact-semantics.test.mjs` (`npm run test:artifacts`) was retired on 2026-10-21 after the replay ruler was asked whether anything among the 20 real defects depends on it: with that gate removed the rate stayed **20 of 20**, because `test:install`, `test:contract`, `test:unit` and `tests/world-consistency.test.mjs` already catch those shapes. Two properties left with it and are **not** covered by anything now — that every path a generated world mounts exists inside `lib/`, and that the world's `isolate:` keys are the ones the consumer ledger enumerates. If either ever has to come back, this paragraph says where it was.
 
 ## The install shapes it is loaded from (issue #101)
 
