@@ -10,8 +10,8 @@
 | --- | --- | --- |
 | A 宿主漂移（契约、名字、注册） | `test:contract` `test:readings` `test:unit` `test:node` `verify:install` `test:compat` | ubuntu + pinned 闭包；compat 每周 windows |
 | B 断言不可能失败（空断言、假绿） | `test:replay`（尺子本身） `test:docs-claims` `deliberate-reds` 台账（`test:seams` 末尾） `typecheck:gate` | 维护者本地 / ubuntu |
-| C 输入形状（工作区路径、盘符、UNC） | `test:world` `test:shapes` `test:install` `test:artifacts` | ubuntu + pinned 闭包；`test:shapes` 真机臂本地 |
-| C 前端状态机（渲染出的文字） | `test:client` `test:docs` | ubuntu |
+| C 输入形状（工作区路径、盘符、UNC） | `test:world` `test:shapes` `test:install` | ubuntu + pinned 闭包；`test:shapes` 真机臂本地 |
+| C 前端状态机（渲染出的文字） | `test:client` | ubuntu |
 | D 真机现形（发行版、9P、ConPTY） | `test:session` `test:win32` `test:wsl` 的 `*-real` 驱动 `test:seams` 的三台探针 | windows-latest，WSL1/WSL2 × src/lib 两平面 |
 | 卫生（已回本，不算覆盖） | `verify` `verify:lib-sync` `verify:artifact` `verify:plane` `test:matrix` `lint:portability` `script-reachability` `check-unit-closure` | ubuntu |
 
@@ -26,7 +26,6 @@
 | `npm run test:world` | 一张工作区形状表喂给所有"决定我会话在哪个发行版哪个 Linux 目录"的 provider，要求逐格一致或显式拒绝 | ubuntu `runtime-tests`（需 pinned 闭包） | `tests/replay/shapes.mjs` 是形状的唯一出处；某格开始同意已登记的洞→红灯是设计如此 |
 | `npm run test:contract` | TypeScript 看不见的半张契约：`ctx.get('…')` 服务名、世界行的 `name:`、同一个世界两行抢一个工具名 | ubuntu `runtime-tests`，**发布前也跑**（`release.yml`） | 先看 `ci/host-contract.json` 的 diff；漂移行会点名对应的重放单元。冲突没登记就红，登记过的洞自己合上也会红 |
 | `npm run test:readings` | 每次发布的两项固定读数：重放命中率、契约闸看到的名字/世界/冲突数 | ubuntu `runtime-tests`，发布前 | 红=没录读数、读数是按别一把尺取的（`tableSha` 变了）、或契约现读数与记录不符。修法就是 `npm run release:readings` 重录一次 |
-| `npm run test:artifacts` | 交给宿主的东西是否符合宿主自己的规则（恰好附加一次、不引入未注册的 `{{…}}`、挂载路径在包里、裸 import 在闭包里、行 id 不重复） | ubuntu `runtime-tests` | 用例名指向 #22/#87/#89/#54；它同时在重放里被证明"对这 20 枚不承重"，删不删由维护者定 |
 | `npm run test:install` | 安装形状：清单表面（真依赖、不得在调用点 import 宿主包）＋ profile 形树的加载 | ubuntu `runtime-tests` | #47/#89 那一族；`P1-P7` 前提是 fixture 的问题不是产品的问题 |
 | `npm run test:node` | 宿主包在场时的装配：shell 执行形、jobs、search、terminal、client 生命周期、`host-materialize`（含 #78 的挂载格）、fallback 与 execute 接缝 | ubuntu `runtime-tests` | 每个 `assert(...)` 的第二参数就是结论；`--pty`/默认两档分别跑 |
 | `npm run test:seams` | 六套接缝驱动（route-envelope、search-run-fakes、tech-debt-exposure、三台真宿主探针）＋故意红台账：观察到的红必须等于声明的红 | ubuntu `runtime-tests` | 台账会写"一票红无人认领"；要么修要么进 `tests/deliberate-reds.mjs` 并附债与修法 |
@@ -38,6 +37,13 @@
 | `npm run test:replay` | 尺子：20 枚真实缺陷重放 | **不进 CI**（它改写工作树，约 5 分钟），发布前由 `release:readings` 跑一次 | 只信"植入后必须有闸红"；`--dry` 抓过时植点，`DSH_REPLAY_SKIP_GATES` 回答"这道闸承不承重" |
 | `npm run test:shapes` | 每个形状走最短一轮：登记→打开→列出→放下 | 本地/维护者；真机臂要 `DSH_SMOKE_REAL=1` | 控制格（默认发行版的 `/` 必须列得出）没过的话，整片"拒绝"读数不算数 |
 | 卫生层：`verify` / `verify:lib-sync` / `verify:artifact` / `verify:plane` / `test:matrix` / `lint:portability` / `typecheck:gate` | 产物同一性、构建可重现、提交产物与源码一致、平面日志、发布矩阵形状、可移植拼写、类型债不增长 | ubuntu `lint-build` / `runtime-tests` / 发布前 | 这些是已回本的地板，重放命中率不是它们的评价标准；要动它们请单独提审 |
+
+## 已退役（2026-10-21，带读数）
+
+- `tests/artifact-semantics.test.mjs`（G3，245 行）与 `npm run test:artifacts`。
+- `scripts/check-docs-parity.mjs` 与 `npm run test:docs`（11 项文档 parity）。`scripts/unwrap-prose.mjs` **保留**：它不只是校验——`release.yml` 用 `--stdout --section` 从英文 CHANGELOG 生成中文 release notes，砍它会砍掉产品功能。
+
+依据是上面那条裁决读数：摘掉这两道，重放仍 20/20。**随它们一起离开的断言，写清楚免得将来重新发现**：① 生成的世界里每个挂载路径都必须在包里存在；② README 的章节名集合、CHANGELOG 中英成对、相对链接图、十语一致。这两条现在没有任何装置守——`tests/readme-compat.test.mjs`（仍在 `test:unit`）还守着 README 的兼容表与发布清单，算半个。
 
 ## 红灯该找谁
 

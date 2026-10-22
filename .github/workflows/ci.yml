@@ -55,8 +55,6 @@ jobs:
           fi
       - name: artifact identity (three packs agree; TESTING.md contract)
         run: node scripts/verify-artifact-identity.mjs
-      - name: documentation parity (declared README sections, shared facts, link graph)
-        run: npm run test:docs
       # The size red line: apparatus (tests/ + scripts/) may not outgrow the product it defends.
       - name: apparatus stays within its size ceiling
         run: npm run test:apparatus-size
@@ -97,10 +95,10 @@ jobs:
       # number that was taken against a different ruler or a different host.
       - name: release readings are recorded and still hold
         run: npm run test:readings
-      # The artifact we hand the host, against the host's own rules (#101, G3), and the install
-      # shapes it is loaded from (#101, G4). Both read the pinned closure; neither boots anything.
-      - name: artifact semantics of the generated variants
-        run: npm run test:artifacts
+      # The install shapes the artifact is loaded from (#101, G4). G3 (`test:artifacts`) was retired
+      # 2026-10-21: the replay ruler showed no defect among its 20 depends on it, and the properties it
+      # held are carried by install-shapes plus the host-interface contract.
+      - name: install shapes (manifest surface + a profile-shaped load)
       - name: install shapes (manifest surface + a profile-shaped load)
         run: npm run test:install
       - name: typecheck does not grow past its recorded baseline

@@ -135,7 +135,7 @@ function hostClaims(packageName) {
  * The worlds this plugin generates, as the rows they mount.
  *
  * Driven from the shipped presets rather than a transcription of them (the same choice
- * `tests/artifact-semantics.test.mjs` made): a row list we wrote ourselves would keep agreeing with
+ * gate this repository used to run made): a row list we wrote ourselves would keep agreeing with
  * itself after the transform changed.
  * @param ownClaims - this package's `lib/<file>.js` to tool-name map.
  * @returns one entry per generated variant, with its rows and their resolved claims.

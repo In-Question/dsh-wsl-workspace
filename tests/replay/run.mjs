@@ -25,7 +25,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import {
-  assertCleanTree, baselineRed, firstRed, plant, repoRoot, revert, runnableIds,
+  assertCleanTree, baselineRed, buildLib, firstRed, plant, repoRoot, revert, runGate, runnableIds,
 } from '../../scripts/mutation-engine.mjs'
 import { CANONICAL, UNITS, gatesFor } from './defects.mjs'
 
@@ -38,6 +38,10 @@ function options(argv) {
     strict: argv.includes('--strict'),
     list: argv.includes('--list'),
     dry: argv.includes('--dry'),
+    allReds: argv.includes('--all-reds'),
+    onlyGates: argv.includes('--only-gates')
+      ? argv[argv.indexOf('--only-gates') + 1].split(',').map(id => id.trim()).filter(Boolean)
+      : undefined,
   }
 }
 
@@ -104,6 +108,28 @@ function summarise(output) {
   return [output.trim().split('\n').filter(line => line.trim() !== '').slice(-2).join(' | ').slice(0, 200)]
 }
 
+/**
+ * Run every consulted gate and report all of the reds, not the first one.
+ *
+ * First-red ordering is what makes a late gate look useless: a plant caught by `unit` in five seconds
+ * never reaches the plane that might also have caught it. This mode is how the real-machine layer
+ * (`seams` / `session` / `wsl`) is asked whether anything depends on it.
+ */
+function worstGate(ids, needsBuild) {
+  const reds = []
+  let built = null
+  for (const id of runnableIds(ids)) {
+    if (needsBuild && ['client', 'node'].includes(id) && built === null) {
+      built = buildLib()
+      if (!built.ok) return { gate: ['build'], output: built.detail }
+    }
+    const result = runGate(id)
+    if (!result.ok) reds.push({ id, output: result.output })
+  }
+  if (reds.length === 0) return { gate: null, output: '' }
+  return { gate: reds.map(entry => entry.id), output: reds.map(entry => entry.output).join('\n') }
+}
+
 const opts = options(process.argv.slice(2))
 const units = opts.only === undefined ? UNITS : UNITS.filter(unit => opts.only.has(unit.id))
 
@@ -134,6 +160,8 @@ if (red.length > 0) {
 
 const started = Date.now()
 const rows = []
+/** Per-plane catch counts, only meaningful with `--all-reds` (first-red ordering hides the rest). */
+const planeCatches = {}
 for (const unit of units) {
   const results = []
   for (const plantSpec of unit.plants) {
@@ -144,16 +172,21 @@ for (const unit of units) {
       continue
     }
     try {
-      const { gate, output } = firstRed(gatesFor(unit), plantSpec.build === true)
+      const consulted = opts.onlyGates === undefined ? gatesFor(unit) : gatesFor(unit).filter(id => opts.onlyGates.includes(id))
+      const { gate, output } = opts.allReds
+        ? worstGate(consulted, plantSpec.build === true)
+        : firstRed(consulted, plantSpec.build === true)
       if (gate === null) {
         results.push({ verdict: 'MISS', detail: `${plantSpec.note} — no gate reddened` })
         continue
       }
       const names = summarise(output)
+      const gates = Array.isArray(gate) ? gate : [gate]
       results.push({
         verdict: 'caught',
-        detail: `${gate}: ${plantSpec.note}`,
-        source: gate === 'build' ? 'build' : catchSource(unit.issue, names),
+        detail: `${gates.join('+')}: ${plantSpec.note}`,
+        gates,
+        source: gates.includes('build') ? 'build' : catchSource(unit.issue, names),
         caughtAs: names.join(' / ').slice(0, 200),
       })
     } catch (error) {
@@ -167,6 +200,7 @@ for (const unit of units) {
   const caught = results.filter(row => row.verdict === 'caught')
   const verdict = invalid.length > 0 ? 'INVALID' : missed.length > 0 ? 'MISS' : 'caught'
   const generic = caught.filter(row => row.source === 'generic').length
+  for (const row of caught) (row.gates ?? []).forEach(g => { planeCatches[g] = (planeCatches[g] ?? 0) + 1 })
   rows.push({
     issue: unit.issue,
     id: unit.id,
@@ -218,7 +252,12 @@ if (opts.json) {
   console.log(`replay: wrote ${relative(repoRoot, path)}`)
 }
 
-if (opts.strict) console.log('strict: the number that would have stopped the original report is the class-wide one.')
+if (Object.keys(planeCatches).length > 1 || opts.onlyGates !== undefined) {
+  console.log(`per-plane red plants (${opts.allReds ? 'every consulted gate ran' : 'first-red ordering'}): ${JSON.stringify(planeCatches)}`)
+  if (opts.onlyGates !== undefined) {
+    console.log(`exclusive to the consulted set (${opts.onlyGates.join(',')}): plants that reddened here and are not counted as caught by the everyday gates — the answer to "does anything depend on this plane" is that number, not the rate.`)
+  }
+}
 
 // The benchmark reports; it does not gate. A plant that cannot be applied, however, means the table
 // and the tree have drifted apart, and that is worth failing a run over.

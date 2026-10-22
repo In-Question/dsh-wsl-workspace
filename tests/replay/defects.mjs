@@ -38,19 +38,20 @@
 // collision as a registered gap, because the product fix has not been made.
 //
 // ADJUDICATION (same table, gates removed rather than first-red counted): running with
-// `DSH_REPLAY_SKIP_GATES=artifacts,docs` still reads 20 of 20. So neither G3 (`artifact-semantics`)
-// nor the docs gate is load-bearing **for these 20 defects** - their plants were caught upstream by
-// unit / world / install / client / contract. That is not the same as deletable: G3 also asserts that
-// every path a generated world mounts exists in the package, and the docs gate holds the ten-locale
-// README parity that no replay plant touches. Deletion is therefore a coverage decision for the user,
-// not a measurement this ruler can make on its own; the reading is recorded so the decision has it.
+// `DSH_REPLAY_SKIP_GATES=artifacts,docs` still read 20 of 20 — neither G3 (`artifact-semantics`) nor
+// the docs gate was load-bearing for these 20 defects; their plants were caught upstream by unit /
+// world / install / client / contract. On 2026-10-21 the user decided to retire both, so `FAST` is
+// now four gates and this table's readings are taken against those four. What left with them, stated
+// so it is not rediscovered the day something breaks: G3 also asserted that every path a generated
+// world mounts exists in the package, and the docs gate held declared README section names, the
+// CHANGELOG pair, the link graph and ten-locale parity. Nothing in this ruler covers those two.
 //
 // What the number is not: it does not say the suite catches the next defect. It says every defect this
 // repository has suffered can be re-planted and is noticed. The residual risk is the classes with no
 // row here at all - which is why the table only grows from a real report.
 
 /** The six fast per-commit gates, in run order; a unit may add planes or override the list. */
-const FAST = ['unit', 'world', 'artifacts', 'install', 'client', 'docs']
+const FAST = ['unit', 'world', 'install', 'client']
 
 /** @returns a multi-line find-string from its lines (keeps the table free of backslash soup). */
 const span = (...lines) => lines.join('\n')
