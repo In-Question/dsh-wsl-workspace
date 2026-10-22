@@ -150,7 +150,7 @@ assertCleanTree('replay')
 
 // Precondition 2: every gate this run will consult must be green on the clean tree. A gate red for an
 // environment reason (no jsdom, no pinned closure) answers "caught" for every plant.
-const idsInScope = [...new Set(units.flatMap(gatesFor))]
+const idsInScope = opts.onlyGates ?? [...new Set(units.flatMap(gatesFor))]
 const red = baselineRed(idsInScope)
 if (red.length > 0) {
   console.error(`replay: these gates are red on a clean tree — an environment, not a measurement: ${red.join(', ')}`)
@@ -172,7 +172,10 @@ for (const unit of units) {
       continue
     }
     try {
-      const consulted = opts.onlyGates === undefined ? gatesFor(unit) : gatesFor(unit).filter(id => opts.onlyGates.includes(id))
+      // `--only-gates` **replaces** the consulted set rather than intersecting it: the units list the
+      // gates their class normally reaches, so intersecting with `seams` would consult nothing and
+      // report "0 of 20" as if that were a reading about the plane. (It did, on the first run.)
+      const consulted = opts.onlyGates === undefined ? gatesFor(unit) : opts.onlyGates
       const { gate, output } = opts.allReds
         ? worstGate(consulted, plantSpec.build === true)
         : firstRed(consulted, plantSpec.build === true)
@@ -234,6 +237,9 @@ const skippedByFlag = (process.env.DSH_REPLAY_SKIP_GATES ?? '').split(',').map(i
 if (skippedByFlag.length > 0) {
   console.log(`ADJUDICATION RUN, not the headline: gates removed by DSH_REPLAY_SKIP_GATES=${skippedByFlag.join(',')}.` +
     ' A unit that still reddened was caught by something else; a unit that went MISS names a gate that was load-bearing.')
+}
+if (opts.onlyGates !== undefined) {
+  console.log(`ADJUDICATION RUN, not the headline: only the gate(s) ${opts.onlyGates.join(',')} were consulted, so this rate measures that plane alone.`)
 }
 if (broken > 0) console.error(`replay: ${broken} unit(s) could not be measured — a plant that does not apply is not a reading.`)
 
