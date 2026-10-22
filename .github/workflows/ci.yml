@@ -99,7 +99,6 @@ jobs:
       # 2026-10-21: the replay ruler showed no defect among its 20 depends on it, and the properties it
       # held are carried by install-shapes plus the host-interface contract.
       - name: install shapes (manifest surface + a profile-shaped load)
-      - name: install shapes (manifest surface + a profile-shaped load)
         run: npm run test:install
       - name: typecheck does not grow past its recorded baseline
         run: node scripts/typecheck-gate.mjs
