@@ -7,8 +7,11 @@
  * header and the "Add workspace…" row in that control's menu are host-private
  * markup. The two entries mounted here are runtime mirrors of those two seats —
  * the shipped control's own `className` is copied (so size, radius, hover and
- * focus are the shipped behaviours rather than lookalikes), and the menu row is
- * a clone of the shipped row (so its icon and item classes come with it).
+ * focus are the shipped behaviours rather than lookalikes), the header button is
+ * drawn through the same Tooltip primitive the shipped control uses (so its
+ * hover bubble is the shipped bubble rather than a native `title` box), and the
+ * menu row is a clone of the shipped row (so its icon and item classes come with
+ * it).
  *
  * Nothing in the host is patched: no module is wrapped and no service is
  * replaced. Every mount is a plain DOM node whose lifecycle this plugin owns,
@@ -20,6 +23,10 @@
  * kept in place by an observer plus a slow interval rather than assumed to
  * survive a render.
  */
+
+import { createElement } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { HostEntryButton } from './hostEntryButton.tsx'
 
 /**
  * The shipped label of the row this menu entry follows, in every locale the
@@ -45,9 +52,10 @@ export interface HostEntryOptions {
  *
  * Discovery walks up from the footer slot (the one element this plugin owns)
  * looking for the section header it is mounted beside, then takes that header's
- * action strip and its last button — the add control. The button is appended to
- * the strip, so it inherits the strip's gap and the add control's own class
- * list.
+ * action strip and its last button — the add control. The entry is rendered into
+ * a slot appended to the strip, so it inherits the strip's gap and the add
+ * control's own class list, and it opens the same Tooltip bubble the add
+ * control does.
  *
  * @param home - the footer slot's element, or null when it is not mounted.
  * @param options - the label getter and the dialog opener.
@@ -64,6 +72,25 @@ export function mountHeaderEntry(home: HTMLElement | null, options: HostEntryOpt
 
   const slot = document.createElement('span')
   slot.className = 'dww-header-slot'
+
+  // The entry is React-owned from here: the shell's Tooltip clones its child to
+  // attach the hover/focus listeners and a ref, so the button cannot be built by
+  // hand and then wrapped by the bubble.
+  let root: Root | null = null
+  let drawn: { className: string; label: string } | null = null
+  /** The dialog opener, stable across renders, so a redraw with the same facts is a no-op commit. */
+  const open = (): void => options.open()
+  /**
+   * Draw (or redraw) the entry with the facts of this pass.
+   * @param className - the shipped add control's class list.
+   * @param label - the localized entry label, which doubles as the tooltip text.
+   */
+  const draw = (className: string, label: string): void => {
+    if (drawn !== null && drawn.className === className && drawn.label === label) return
+    drawn = { className, label }
+    if (root === null) root = createRoot(slot)
+    root.render(createElement(HostEntryButton, { className, label, open }))
+  }
 
   /**
    * The header's action strip and its last button (the add control), found from
@@ -108,20 +135,7 @@ export function mountHeaderEntry(home: HTMLElement | null, options: HostEntryOpt
       return
     }
     if (slot.parentElement !== found.actions) found.actions.appendChild(slot)
-    let button = slot.querySelector('button')
-    if (button === null) {
-      button = document.createElement('button')
-      button.type = 'button'
-      button.setAttribute('aria-haspopup', 'dialog')
-      button.appendChild(glyph())
-      button.addEventListener('click', () => options.open())
-      slot.appendChild(button)
-    }
-    const className = `${found.add.className} dww-header-entry`
-    if (button.className !== className) button.className = className
-    const label = options.label()
-    if (button.title !== label) button.title = label
-    if (button.getAttribute('aria-label') !== label) button.setAttribute('aria-label', label)
+    draw(found.add.className, options.label())
     if (observed !== found.actions) {
       // The strip is re-rendered by React whenever the sidebar's search state or
       // the workspace list changes, and that drops unknown children with it.
@@ -151,6 +165,9 @@ export function mountHeaderEntry(home: HTMLElement | null, options: HostEntryOpt
   return () => {
     bodyObserver.disconnect()
     if (observer !== null) observer.disconnect()
+    // The header is host markup; the root this plugin opened inside it must go too.
+    if (root !== null) root.unmount()
+    root = null
     slot.remove()
   }
 }
@@ -277,13 +294,4 @@ export function mountWorkspaceMenuEntry(options: HostEntryOptions): () => void {
     observer.disconnect()
     for (const stale of document.querySelectorAll('[data-dww-menu-entry]')) stale.remove()
   }
-}
-
-/** The W glyph the shipped entry carries, and the only visible content it adds. */
-function glyph(): HTMLSpanElement {
-  const letter = document.createElement('span')
-  letter.className = 'dww-letter'
-  letter.setAttribute('aria-hidden', 'true')
-  letter.textContent = 'W'
-  return letter
 }

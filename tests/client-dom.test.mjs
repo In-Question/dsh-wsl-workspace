@@ -54,8 +54,15 @@ globalThis.KeyboardEvent = dom.window.KeyboardEvent
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 const React = require('react')
-const { createRoot } = require('react-dom/client')
+const ReactDOMClient = require('react-dom/client')
+const { createRoot } = ReactDOMClient
 const jsxRuntime = require('react/jsx-runtime')
+// The shell's shared primitives table is a platform module, not a package on disk. This stub stands
+// in for the one member the header entry uses and leaves the label visible as an attribute, so the
+// test can tell the tooltip text from a native `title` bubble.
+const primitives = {
+  Tooltip: ({ label, children }) => React.cloneElement(children, { 'data-tooltip': label }),
+}
 const source = readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8')
 const flush = () => new Promise(resolve => setTimeout(resolve, 0))
 
@@ -123,6 +130,8 @@ function mount(scenario, { wide = true } = {}) {
   dom.window.__ModuleLoader__ = { load: mod => { plugin = mod.factory(specifier => {
     if (specifier === 'react') return React
     if (specifier === 'react/jsx-runtime') return jsxRuntime
+    if (specifier === 'react-dom/client') return ReactDOMClient
+    if (specifier === '@deepseek-ai/dsh-client-ui-primitives') return primitives
     throw new Error(`unexpected require(${specifier})`)
   }) } }
   // The DOM's timers, not the host's: the bundle arms a 60-second roster refresh and the process
@@ -134,6 +143,8 @@ function mount(scenario, { wide = true } = {}) {
     new Function('window', 'document', 'require', source)(dom.window, globalThis.document, specifier => {
       if (specifier === 'react') return React
       if (specifier === 'react/jsx-runtime') return jsxRuntime
+      if (specifier === 'react-dom/client') return ReactDOMClient
+      if (specifier === '@deepseek-ai/dsh-client-ui-primitives') return primitives
       throw new Error(`unexpected require(${specifier})`)
     })
     plugin.apply(ctx)
@@ -503,7 +514,9 @@ test('the entry joins the section header beside the shipped add control', { time
     assert.ok(entry !== null, `the header carries no entry: ${region.innerHTML.slice(0, 300)}`)
     assert.equal(entry.className, 'host_icon dww-header-entry',
       'the shipped control`s own class list is what makes the box the shipped box')
-    assert.equal(entry.title, client.zh()['action.entry'], 'the hover label is the entry`s own sentence')
+    assert.equal(entry.getAttribute('data-tooltip'), client.zh()['action.entry'],
+      'the hover label is the entry`s own sentence, drawn by the shell`s tooltip primitive')
+    assert.equal(entry.title, '', 'the entry must not fall back to the browser`s native title bubble')
     assert.equal(entry.closest('[class*="_headerActions"]')?.lastElementChild?.contains(entry), true,
       'the entry sits inside the action strip, not beside it')
     assert.equal(client.container.querySelector('.dww-action').hidden, true,
